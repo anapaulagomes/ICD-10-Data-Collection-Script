@@ -13,6 +13,7 @@ This Python script fetches and saves data for ICD-10 codes from the World Health
 
 - Python 3.6 or higher
 - `requests` library
+- https://icd.who.int/icdapi Account to generate TOKEN
 
 ## Installation
 
