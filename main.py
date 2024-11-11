@@ -18,7 +18,8 @@ Options:
   --output-dir DIR     Directory to save the JSON files (default: icd_data)
   --delay SECONDS      Delay between API requests in seconds (default: 0.5)
   --log-file FILE      Log file path (default: icd_api.log)
-  --config-file FILE   Path to a configuration file
+  --config-file FILE   Path to a configuration file. If you don't have a token,
+                       you can provide client_id and client_secret in a config file.
 
 For more information, see the README.md file.
 """
@@ -36,6 +37,7 @@ from configparser import ConfigParser
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
 def load_config():
     parser = argparse.ArgumentParser(description="Fetch and save ICD-10 data from WHO API")
     parser.add_argument("--token", help="Bearer token for API authentication")
@@ -50,10 +52,34 @@ def load_config():
         config = ConfigParser()
         config.read(args.config_file)
         defaults = dict(config['DEFAULT'])
+        if not defaults['token']:
+            token = get_token_from_icd_api(defaults['client_id'], defaults['client_secret'])
+            defaults['token'] = token
         parser.set_defaults(**defaults)
         args = parser.parse_args()  # re-parse args to override with config file values
-    
+
+    if not args.token:
+        raise Exception("Please provide a token or a config file with client_id and client_secret")
     return args
+
+
+def get_token_from_icd_api(client_id, client_secret):
+    payload = {
+        'client_id': client_id,
+        'client_secret': client_secret,
+        'scope': 'icdapi_access',
+        'grant_type': 'client_credentials'
+    }
+    response = requests.post(
+        'https://icdaccessmanagement.who.int/connect/token',
+        data=payload,
+        verify=False
+    )
+    if response.ok:
+        response = response.json()
+        return response['access_token']
+    return
+
 
 def fetch_icd_data(code, token):
     url = f'https://id.who.int/icd/release/10/2010/{code}'
@@ -72,6 +98,7 @@ def fetch_icd_data(code, token):
         logger.error(f"Error fetching data for code {code}: {str(e)}")
         return None
 
+
 def save_icd_data(data, code, output_dir):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -84,8 +111,10 @@ def save_icd_data(data, code, output_dir):
     except IOError as e:
         logger.error(f"Error saving data for code {code}: {str(e)}")
 
+
 def process_icd_code(code, config):
     logger.info(f"Fetching data for ICD-10 code: {code}")
+
     data = fetch_icd_data(code, config.token)
     
     if data:
@@ -98,6 +127,7 @@ def process_icd_code(code, config):
     
     time.sleep(config.delay)
 
+
 def get_root_codes(token):
     root_data = fetch_icd_data('', token)
     if isinstance(root_data, dict) and 'child' in root_data:
@@ -105,6 +135,7 @@ def get_root_codes(token):
     else:
         logger.warning("Error fetching root codes. Using default list.")
         return ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI', 'XXII']
+
 
 def main():
     config = load_config()
@@ -124,6 +155,7 @@ def main():
         process_icd_code(code, config)
 
     logger.info("Data collection and saving complete.")
+
 
 if __name__ == "__main__":
     main()
