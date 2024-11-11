@@ -52,7 +52,7 @@ def load_config():
         config = ConfigParser()
         config.read(args.config_file)
         defaults = dict(config['DEFAULT'])
-        if not defaults['token']:
+        if not defaults.get('token'):
             token = get_token_from_icd_api(defaults['client_id'], defaults['client_secret'])
             defaults['token'] = token
         parser.set_defaults(**defaults)
