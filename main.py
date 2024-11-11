@@ -23,6 +23,7 @@ Options:
 
 For more information, see the README.md file.
 """
+from pathlib import Path
 
 import requests
 import json
@@ -112,18 +113,23 @@ def save_icd_data(data, code, output_dir):
         logger.error(f"Error saving data for code {code}: {str(e)}")
 
 
-def process_icd_code(code, config):
+def process_icd_code(code, config, existing_codes=None):
     logger.info(f"Fetching data for ICD-10 code: {code}")
 
-    data = fetch_icd_data(code, config.token)
-    
+    potential_name = f'icd10_{code.replace(".", "_").replace("/", "_")}.json'
+    if existing_codes and potential_name in existing_codes:
+        logger.info(f"Code {code} already exists ({potential_name}). Skipping.")
+        return
+    else:
+        data = fetch_icd_data(code, config.token)
+
     if data:
         save_icd_data(data, code, config.output_dir)
         
         if 'child' in data:
             for child_url in data['child']:
                 child_code = unquote(child_url.split('/')[-1])
-                process_icd_code(child_code, config)
+                process_icd_code(child_code, config, existing_codes=existing_codes)
     
     time.sleep(config.delay)
 
@@ -151,8 +157,13 @@ def main():
     root_codes = get_root_codes(config.token)
     logger.info(f"Root codes: {root_codes}")
 
+    if config.check_existing:
+        directory = Path(config.output_dir)
+        existing_codes = [f.name for f in directory.iterdir() if f.is_file() and f.name.endswith('.json')]
+        logger.info(f"There are {len(existing_codes)} existing codes")
+
     for code in root_codes:
-        process_icd_code(code, config)
+        process_icd_code(code, config, existing_codes=existing_codes)
 
     logger.info("Data collection and saving complete.")
 
