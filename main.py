@@ -157,6 +157,7 @@ def main():
     root_codes = get_root_codes(config.token)
     logger.info(f"Root codes: {root_codes}")
 
+    existing_codes = None
     if config.check_existing:
         directory = Path(config.output_dir)
         existing_codes = [f.name for f in directory.iterdir() if f.is_file() and f.name.endswith('.json')]
